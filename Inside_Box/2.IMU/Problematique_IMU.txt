@@ -1,0 +1,49 @@
+A la base des bases:
+Librairies écrites par HillCrestLabs pour comm' avec le BNO
+Options
+- 1) Arduino <-I2C-> BNO (I2C trop lent! 400kHz)
+- 2) C++ + WiringPi <-SPI-> BNO (fait par Guillaume)
+- 3) Python + WiringPi <-SPI-> BNO (WPi DEPRECIEE pour Python!!! + Surcouche => lent)
+- 4) Python + Interfaçage GPIO/SPI <-SPI-> BNO (la meilleure solution au final, moins casse-tête)
+
+Datasheet/Guide BNO080
+https://learn.sparkfun.com/tutorials/qwiic-vr-imu-bno080-hookup-guide/all#library-overview
+
+exemple combi RPi.GPIO et spidev
+https://raspberrypi-aa.github.io/session3/spi.html
+
+
+info générales des pins (GPIO) du rpi
+- https://www.raspberrypi.org/documentation/usage/gpio/
+- https://mamerium.com/raspberry-pi-rpi-gpio-setup/ (init GPIO en jpn :p)
++ pin numbering https://pinout.xyz/
+
+LIBRAIRIES
+info RPi.GPIO
+- Note importante
+-- https://pypi.org/project/RPi.GPIO/
+--- "Note that this module is unsuitable for real-time or timing critical applications.
+--- [...]  If you are after true real-time performance and predictability, buy yourself an Arduino http://www.arduino.cc !
+--- [...] Note that the current release does not support SPI, [...]".
+--- /!\ MAIS RPi.GPIO SERIVRA QD MEME POUR SET LES GPIO QUI N'UTILISENT PAS SPI
+- usage
+-- https://sourceforge.net/p/raspberry-gpio-python/wiki/BasicUsage/
+-- https://www.raspberrypi-spy.co.uk/2012/05/install-rpi-gpio-python-library/
+
+
+info SPI/spidev
+- protocol
+-- https://projectiot123.com/2019/01/19/enabling-the-spi-port-in-raspberry-pi/
+-- https://www.analog.com/en/analog-dialogue/articles/introduction-to-spi-interface.html#
+- set-up spidev
+-- https://projectiot123.com/2019/01/19/spi-interface-of-raspberry-pi-using-python/
+-- https://projectiot123.com/2019/01/19/spi-interface-of-raspberry-pi-using-python/
+-- https://pypi.org/project/spidev/
+
+PB FREQUENCE ?
+--> RPi.GPIO avec Python : max 70kHz
+https://codeandlife.com/2012/07/03/benchmarking-raspberry-pi-gpio-speed/
+
+--> spidev
+https://www.raspberrypi.org/documentation/hardware/raspberrypi/spi/README.md (avec linux kernel)
+https://raspberrypi.stackexchange.com/questions/699/what-spi-frequencies-does-raspberry-pi-support

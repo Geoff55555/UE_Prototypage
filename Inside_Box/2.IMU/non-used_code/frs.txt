@@ -1,0 +1,51 @@
+# -------------------------------------------------------------------
+# -------------------- ASK/RECEIVE USEFUL DATA ----------------------
+# -------------------------------------------------------------------
+
+# Ask the sensor for data from the Flash Record System (FRS)
+# See [4]p.40 6.3.6
+def frsReadRequest(recordID, readOffset, blockSize):  # [2] L557
+    # NB: Word = 16-bit = 2 bytes
+    # readOffset (= word) will be the StartLocation for reading
+    # recordID (=word) will designate the sensor to ask for info
+    # blockSize (=word) will be the # of words to read
+
+    # Cut the words in LSB and MSB bytes --> word % 256 = LSB byte and word // 256 (floor div) = MSB byte
+    # Preparing package according to [4]p.40 6.3.6
+    shtpData[0] = SHTP_REPORT_FRS_READ_REQUEST  # Report ID for FRS Read Request
+    shtpData[1] = 0                             # Reserved
+    shtpData[2] = readOffset % 256              # Read Offset LSB
+    shtpData[3] = readOffset // 256             # Read Offset MSB
+    shtpData[4] = recordID % 256                # FRS Type LSB
+    shtpData[5] = recordID // 256               # FRS Type MSB
+    shtpData[6] = blockSize % 256               # Block size LSB
+    shtpData[7] = blockSize // 256              # Block size MSB
+    # Transmit packet on channel 2, 8 bytes
+    print("Sending FRS request")
+    sendSPIPacket(channel.index("Control"), 8)
+
+
+# Given a sensor or record ID, and given start/stop bytes, read the data from the Flash Record System (FRS) for this sensor
+# Returns True if metadata array is loaded successfully
+# Return False if failure
+def readFRSdata(recordID, startLocation, wordsToRead):  # [2] L574
+    # First we send a FRS request
+    frsReadRequest(recordID, startLocation, wordsToRead)  # From a start location of record, read a # of words
+
+    # Read bytes until FRS reports that the read is complete
+    while True:
+        counter = 0
+        while receiveSPIPacket() == False:
+            if counter > 100:
+                counter += 1
+                return False  # Give up
+            time.sleep(0.001)  # Waits 1ms
+        # We have the packet, inspect it for right contents
+        # See page 40 : ReportID should be 0xF3 and the FRS types should match the thing we requested
+        if shtpData[0] == SHTP_REPORT_FRS_READ_RESPONSE:
+            # Getting the word "RecordID" from shtpData[13] (MSB byte) and shtpData[12] (LSB byte)
+            RecordIDreceived = shtpData[13]*256 + shtpData[12]
+            if RecordIDreceived == recordID:
+                print("We received the response to our FRS Read Resquest")
+                break  # this is the packet we're looking for
+

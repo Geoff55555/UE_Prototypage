@@ -1,0 +1,30 @@
+dl la version extended
+https://puredata.info/downloads/pd-extended/releases/0.43.4
+
+doc en ligne:
+https://fr.flossmanuals.net/puredata/introduction/
+doc officielle:
+file:///C:/Program%20Files/Pd/doc/1.manual/index.htm
+en html https://puredata.info/docs/manuals/pd/x2.htm
+
+schéma puredata
+http://write.flossmanuals.net/pure-data/osc/
+
+OSC:
+https://osc4py3.readthedocs.io/en/latest/userdoc.html#sending-messages
+(librairie osc4py3)
+
+TUTO OSC 
+https://www.youtube.com/watch?v=OOLmCQgcQ6E
+
+TUTO VISU AUDIO
+https://www.youtube.com/watch?v=-y2SP2B6NxY
+
+INFO SELECTION/MULTIPLEXING
+--> Naviagteur d'aide>Manuals>0.Intro<36.selecting_events
+
+EFFETS:
+-PACKAGE DISTORTUS
+-* https://www.youtube.com/watch?v=z11Rqp9LGws or http://139notfound.blogspot.com/2017/03/piuredatadistotus-onedistortion.html
+--* --> En faire des patch perso
+-* filtrer les basses https://www.youtube.com/watch?v=L_GHf0U-pdg

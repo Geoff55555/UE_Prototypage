@@ -1,0 +1,55 @@
+{
+    "data": {
+        "coordinatesType": 1,
+        "coordinates": {
+            "z": 1000,
+            "x": 6898,
+            "y": 17331
+        },
+        "anchorData": [{
+                "rss": -92.15,
+                "tagId": "26920",
+                "anchorId": "22367"
+            },
+            {
+                "rss": -87.22,
+                "tagId": "26920",
+                "anchorId": "24660"
+            },
+            {
+                "rss": -84.74,
+                "tagId": "26920",
+                "anchorId": "17671"
+            },
+            {
+                "rss": -92.52,
+                "tagId": "26920",
+                "anchorId": "4226"
+            }
+		],
+        "tagData": {
+            "sensors": [{
+                    "value": "",
+                    "name": "CUSTOM_PAYLOAD"
+                }
+			],
+            "blinkIndex": 13296
+        },
+        "metrics": {
+            "latency": 18,
+            "rates": {
+                "packetLoss": 0,
+                "success": 1.05,
+                "update": 1.05
+            }
+        },
+        "extras": {
+            "version": "0.1",
+            "zones": []
+        }
+    },
+    "success": true,
+    "timestamp": 1569252240.7322404,
+    "tagId": "26920",
+    "version": "1.4"
+}

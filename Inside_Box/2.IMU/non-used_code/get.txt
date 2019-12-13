@@ -1,0 +1,115 @@
+
+# -------------------------------------------------------------------
+# ---------------------- GET EVERYTHING -----------------------------
+# -------------------------------------------------------------------
+
+# Given a register value and a Q point, convert to float [2] L677
+def qToFloat(fixedPointValue, qPoint):
+    qFloat = fixedPointValue
+    qFloat *= pow(2, qPoint * - 1)
+    return qFloat
+
+# Return the rotation vector quaternion I
+def getQuatI():
+    quat = qToFloat(rawQuatI, rotationVector_Q1)
+    return quat
+
+    
+def getQuatJ():
+    quat = qToFloat(rawQuatJ, rotationVector_Q1)
+    return quat
+
+
+def getQuatK():
+    quat = qToFloat(rawQuatK, rotationVector_Q1)
+    return quat
+
+
+def getQuatReal():
+    quat = qToFloat(rawQuatReal, rotationVector_Q1)
+    return quat
+
+
+def getQuatRadianAccuracy():
+    quat = qToFloat(rawQuatRadianAccuracy, rotationVector_Q1)
+    return quat
+
+
+def getQuatAccuracy():
+    return quatAccuracy
+
+
+def getAccelX():
+    accel = qToFloat(rawAccelX, accelerometer_Q1)
+    return accel
+
+
+def getAccelY():
+    accel = qToFloat(rawAccelY, accelerometer_Q1)
+    return accel
+
+
+def getAccelZ():
+    accel = qToFloat(rawAccelZ, accelerometer_Q1)
+    return accel
+
+
+def getAccelAccuracy():
+    return accelAccuracy
+
+
+def getLinAccelX():
+    accel = qToFloat(rawAccelX, accelerometer_Q1)
+    return accel
+
+
+def getLinAccelY():
+    accel = qToFloat(rawAccelY, accelerometer_Q1)
+    return accel
+
+
+def getLinAccelZ():
+    accel = qToFloat(rawAccelZ, accelerometer_Q1)
+    return accel
+
+
+def getLinAccelAccuracy():
+    return accelLinAccuracy
+
+
+def getGyroX():
+    gyro = qToFloat(rawGyroX, gyro_Q1)
+    return gyro
+
+
+def getGyroY():
+    gyro = qToFloat(rawGyroY, gyro_Q1)
+    return gyro
+
+
+def getGyroZ():
+    gyro = qToFloat(rawGyroZ, gyro_Q1)
+    return gyro
+
+
+def getGyroAccuracy():
+    return gyroAccuracy
+
+
+def getMagX():
+    mag = qToFloat(rawAccelX, accelerometer_Q1)
+    return mag
+
+
+def getMagY():
+    mag = qToFloat(rawAccelY, accelerometer_Q1)
+    return mag
+
+
+def getMagZ():
+    mag = qToFloat(rawAccelZ, accelerometer_Q1)
+    return mag
+
+
+def getMagAccuracy():
+    return magAccuracy

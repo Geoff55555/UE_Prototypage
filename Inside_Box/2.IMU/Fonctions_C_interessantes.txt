@@ -1,0 +1,43 @@
+Chemins intéressants pour target les fonctions à traduire impérativement:
+
+Le but: pouvoir exécuter une fct similaire à imuFunc() dans IMUManager
+imuFunc(); : "fonction récupérant les quaternions, exécutée sur un thread en permanence"
+
+Fonctions primordiales dans cette imuFunc():
+OK1. beginSPI
+primordial pour initier la comm' SPI entre RPi et BNO080
+Dedans on a besoin de :
+OK-- waitForPinResponse (initialement nommé waitForSPI)
+OK-- receiveSPIPacket (initialement nommé receivePacket)
+OK-- sendSPIPacket (init nommé sendPacket)
+OK-- printHeader (init nommé printPacket, moi je print que le header pcq le packet se print en une seule ligne de cmd)
+
+2. dataAvailable --> pour récup les données
+OK- parseInputReport
+OK- parseCommandReport
+OK- getQuatX  pour X= I, J, K et Real
+OK-- qToFloat(rawQuatX, rotationVector_QY)
+OK- getQuatAccuracy()
+OK- getMagAccuracy()
+
+3.OK enableX --> pour que le BNO envoie les données
+OK- X= Magnetometer
+OK- X= RotationVector
+OK-- pour les 2 : setFeatureCommand
+
+4.OK calibration
+-OK calibrateIMU()
+--OK calibrateAll()
+---OK sendCalibrateCommand
+----OK sendCommand
+--OK checkCalibration()
+--OK saveCalibration()
+--OK requestCalibrationStatus()
+--OK calibrationComplete()
+--OK endCalibration()
+
++ OK StartIMU()
+
+
+5. reset //pour pouvoir recommuniquer post calibration
+OK- softReset()

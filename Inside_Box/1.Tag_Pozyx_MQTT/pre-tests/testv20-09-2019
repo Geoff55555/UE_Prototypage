@@ -1,0 +1,10 @@
+import time
+
+close = False
+
+print('This is the test')
+
+while close:
+   time.sleep(100)
+   print('you asked to close the program')
+   exit()
