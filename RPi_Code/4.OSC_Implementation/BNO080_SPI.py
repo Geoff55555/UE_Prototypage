@@ -22,7 +22,7 @@ _rst = None
 spi = None
 _spiPort = None
 _spiPortSpeed = None
-unsolicited_init_happened = False  # in case an unsolicited init happened, we want to know it, see parseCommandReport
+unsolicited_init_happened = False  # in case an unsolicited init happened, we want to know it, see parseCommandReport()
 
 # - Prints
 debug_print = False
@@ -67,7 +67,8 @@ last_report_id = None
 
 COMMAND_DCD = 6  # [3] L91
 COMMAND_ME_CALIBRATE = 7  # [3] L92
-COMMAND_INIT_UNSOLICITED = 132  # [4] point 6.4.5.2 Initialize response
+COMMAND_INIT_UNSOLICITED = 132  # [4] point 6.4.5.2 initialize response
+COMMAND_DCD_PERIODIC = 9
 
 CALIBRATE_ACCEL = 0  # [3] from L97
 CALIBRATE_GYRO = 1
@@ -87,10 +88,10 @@ seqNbr = [0, 0, 0, 0, 0, 0]  # There are 6 comm channels. Each channel has its o
 
 # - Raw sensor values
 rawAccelX, rawAccelY, rawAccelZ, accelAccuracy = None, None, None, None  # [3] L214
-rawLinAccelX, rawLinAccelY, rawLinAccelZ, accelLinAccuracy, lin_accel = None, None, None, None, [0,0,0]
+rawLinAccelX, rawLinAccelY, rawLinAccelZ, lin_accelAccuracy, lin_accel = None, None, None, None, [0, 0, 0]
 rawGyroX, rawGyroY, rawGyroZ, gyroAccuracy = None, None, None, None
 rawMagX, rawMagY, rawMagZ, magAccuracy = None, None, None, None
-rawQuatI, rawQuatJ, rawQuatK, rawQuatReal, rawQuatRadianAccuracy, quatAccuracy, quat_r_ijk = None, None, None, None, None, None, [0,0,0,0]
+rawQuatI, rawQuatJ, rawQuatK, rawQuatReal, rawQuatRadianAccuracy, quatAccuracy, quat_r_ijk = None, None, None, None, None, None, [0, 0, 0, 0]
 stepCount = None
 timeStamp = None
 stabilityClassifier = None
@@ -273,8 +274,11 @@ def beginSPI(user_bcm_CSPin, user_bcm_WAKPin, user_bcm_INTPin, user_bcm_RSTPin, 
 def waitForINT():
     if debug_print: print(".")  # lighten log
     if debug_print: print("Waiting INT Pin to trigger")
-    # wait for up to 5 seconds for a falling edge (timeout is in ms)
-    if GPIO.wait_for_edge(_int, GPIO.FALLING, timeout=5000):
+    # wait for up to 10 seconds for a falling edge (timeout is in ms)
+    # --> after some debugging in reality it is less than 10 sec before this triggers...
+    # It appears that the BNO or the RPi need some more time in some cases...
+    # So to avoid "Pin Timeout" to soon we extended this to 10000ms
+    if GPIO.wait_for_edge(_int, GPIO.FALLING, timeout=10000):
         if debug_print:
             print("[BNO080] ready!")
             print(".")  # lighten log
@@ -290,7 +294,7 @@ def waitForPinResponse(input):
     else:
         if debug_print: print("Waiting for Pin BCM nbr " + str(input) + " connection")
 
-    for count in range(10000):
+    for count in range(65535):
         if GPIO.input(input) == GPIO.LOW:
             if debug_print:
                 if input == 4:
@@ -405,6 +409,8 @@ def sendSPIPacket(channelNbr, data_length):  # [2]L1017
     headerBuffer[2] = channelNbr
     headerBuffer[3] = seqNbr[channelNbr]
     seqNbr[channelNbr] = seqNbr[channelNbr] + 1
+    if seqNbr[channelNbr] >= 256:
+        seqNbr[channelNbr] = 0
 
     # 2. Send the header to BNO080
     if debug_print: print("[BNO080] RPi Sending headerBuffer : " + str(headerBuffer))
@@ -496,12 +502,6 @@ def setFeatureCommand(reportID, timeBetweenReports):  # [2] L787
 
 
 # Sends the packet to enable the magnetometer
-def enableLinearAccelerometer(timeBetweenReports):  # [2] L717
-    print("Enabling Magnetometer (with time between reports = ", timeBetweenReports, " ms)")
-    setFeatureCommand(SENSOR_REPORTID_LINEAR_ACCELERATION, timeBetweenReports)
-
-
-# Sends the packet to enable the magnetometer
 def enableMagnetometer(timeBetweenReports):  # [2] L717
     print("Enabling Magnetometer (with time between reports = ", timeBetweenReports, " ms)")
     setFeatureCommand(SENSOR_REPORTID_MAGNETIC_FIELD, timeBetweenReports)
@@ -519,6 +519,12 @@ def enableGameRotationVector(timeBetweenReports):
     setFeatureCommand(SENSOR_REPORTID_GAME_ROTATION_VECTOR, timeBetweenReports)
 
 
+# Sends the packet to enable the accelerometer (to get linear accel data)
+def enableLinearAccelerometer(timeBetweenReports):
+    print("Enabling linear accelerometer (with time between reports = ", timeBetweenReports, " ms)")
+    setFeatureCommand(SENSOR_REPORTID_LINEAR_ACCELERATION, timeBetweenReports)
+
+
 # -------------------------------------------------------------------
 # ------------------ USEFUL DATA INTERPRETATION ---------------------
 # -------------------------------------------------------------------
@@ -526,7 +532,7 @@ def enableGameRotationVector(timeBetweenReports):
 def parseInputReport():  # [2]L197
     # Because we want to access and modify the global variables
     global rawAccelX, rawAccelY, rawAccelZ, accelAccuracy
-    global rawLinAccelX, rawLinAccelY, rawLinAccelZ, accelLinAccuracy, lin_accel
+    global rawLinAccelX, rawLinAccelY, rawLinAccelZ, lin_accelAccuracy, lin_accel
     global rawGyroX, rawGyroY, rawGyroZ, gyroAccuracy
     global rawMagX, rawMagY, rawMagZ, magAccuracy
     global rawQuatI, rawQuatJ, rawQuatK, rawQuatReal, rawQuatRadianAccuracy, quatAccuracy, quat_r_ijk
@@ -556,15 +562,18 @@ def parseInputReport():  # [2]L197
             if data_print: print("SENSOR_REPORTID_ACCELEROMETER")
             accelAccuracy = status
             rawAccelX = data1
+            lin_accel[0] = getLinAccelX()
             rawAccelY = data2
+            lin_accel[1] = getLinAccelY()
             rawAccelZ = data3
+            lin_accel[2] = getLinAccelZ()
+            print("[BNO080] lin_accel acc = ", accelAccuracy)
 
-        elif shtpData[5] == SENSOR_REPORTID_LINEAR_ACCELERATION:  # NEW
+        elif shtpData[5] == SENSOR_REPORTID_LINEAR_ACCELERATION:
             if data_print: print("SENSOR_REPORTID_LINEAR_ACCELERATION")
-            accelLinAccuracy = status
+            lin_accelAccuracy = status
             rawLinAccelX = data1
-            #print("RAW LIN ACCEL X UPDATED WITH : ", rawLinAccelX)
-            lin_accel[0] = getLinAccelX()  # translate raw (qpoint value) into real quat
+            lin_accel[0] = getLinAccelX()
             rawLinAccelY = data2
             lin_accel[1] = getLinAccelY()
             rawLinAccelZ = data3
@@ -587,10 +596,10 @@ def parseInputReport():  # [2]L197
             # print("[BNO080] rawMagXYZ = [", getMagX(), " , ", getMagY(), " , ", getMagZ(), "]")
 
         elif shtpData[5] == SENSOR_REPORTID_ROTATION_VECTOR or shtpData[5] == SENSOR_REPORTID_GAME_ROTATION_VECTOR:
-            if data_print: print("SENSOR_REPORTID_ROTATION_VECTOR or SENSOR_REPORTID_GAME_ROTATION_VECTOR")
+            if debug_print: print("SENSOR_REPORTID_ROTATION_VECTOR or SENSOR_REPORTID_GAME_ROTATION_VECTOR")
             quatAccuracy = status
             rawQuatI = data1
-            quat_r_ijk[1] = getQuatI()  # translate raw (qpoint value) into real quat
+            quat_r_ijk[1] = getQuatI()
             rawQuatJ = data2
             quat_r_ijk[2] = getQuatJ()
             rawQuatK = data3
@@ -633,7 +642,7 @@ def parseInputReport():  # [2]L197
                 if data_print: print("[BNO080] Calibration status = ", calibrationStatus)
 
         else:
-            if data_print: print("[BNO080] Sensor Report ID :", shtpData[5], "not handled")
+            if data_print: print("[BNO080] Sensor Report ID : ", shtpData[5], " not handled")
 
         return True
     except IndexError as e:
@@ -649,9 +658,9 @@ def parseCommandReport():
         if data_print: print("[BNO080] Command byte is ", command)
 
         if command == COMMAND_INIT_UNSOLICITED:
-            print("[BNO080] sent an unsolicited init response = ", shtpData[5], " --> 0 = successful, 1 = failed")
-            unsolicited_init_happened = True  # this info will be reused to ask (again) data to the BNO, see update_data()
-        if command == COMMAND_ME_CALIBRATE:
+            print("[BNO080] sent an unsolicited init response = ", shtpData[5], "--> 0 = successful, 1 = failed")
+            unsolicited_init_happened = True
+        elif command == COMMAND_ME_CALIBRATE:
             if data_print: print("[BNO080] sent calibrate command request")
             calibrationStatus = shtpData[5 + 0]  # R0 - Status (0 = success, non-zero = fail)
             if data_print: print("[BNO080] Calibration answer is : ", calibrationStatus, " (0 = SUCCESS otherwise FAIL)")
@@ -659,11 +668,9 @@ def parseCommandReport():
             if data_print: print("[BNO080] answered about Save Calibration request")
             calibrationSavedStatus = shtpData[5 + 0]  # R0 - Status (0 = success, non-zero = fail)
         else:
-            if data_print: print("[BNO080] command report not handled")
-    else:
-        # This sensor report ID is unhandled.
-        # See [4] to add additional feature reports as needed
-        if data_print: print("[BNO080] Sensor report ID = ", shtpData[0], "is not handled")
+            # This sensor report ID is unhandled.
+            # See [4] to add additional feature reports as needed
+            if data_print: print("[BNO080] Sensor report ID = ", shtpData[0], "is not handled")
 
     # TODO additional feature reports may be strung together. Parse them all.
 
@@ -674,32 +681,32 @@ def parseCommandReport():
 
 # Given a register value and a Q point, convert to float [2] L677
 def qToFloat(fixedPointValue, qPoint):
-    q_float = 0
+    q_float = 0.0
     if fixedPointValue is not None:
         q_float = fixedPointValue
-        q_float *= pow(2, qPoint * - 1)
+        q_float *= pow(2, -qPoint)
     return q_float
 
 
 # Return the rotation vector quaternion I
 def getQuatI():
-    return qToFloat(rawQuatI, rotationVector_Q1)  # qpoint of 14
+    quat = qToFloat(rawQuatI, rotationVector_Q1)  # qpoint of 14
+    return quat
 
 
 def getQuatJ():
-    return qToFloat(rawQuatJ, rotationVector_Q1)
+    quat = qToFloat(rawQuatJ, rotationVector_Q1)
+    return quat
 
 
 def getQuatK():
-    return qToFloat(rawQuatK, rotationVector_Q1)
+    quat = qToFloat(rawQuatK, rotationVector_Q1)
+    return quat
 
 
 def getQuatReal():
-    return qToFloat(rawQuatReal, rotationVector_Q1)
-
-
-def getQuatAccuracy():
-    return quatAccuracy
+    quat = qToFloat(rawQuatReal, rotationVector_Q1)
+    return quat
 
 
 def quat_to_euler_conv(quaternion_array):
@@ -709,14 +716,14 @@ def quat_to_euler_conv(quaternion_array):
     k = quaternion_array[3]
     euler_angles = [0,0,0]  # order x,y,z
     # formulas from : https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
-    euler_angles[0] = math.atan((2*(r*i+j*k))/(1-2*(i*i+j*j)))
+    euler_angles[0] = math.atan2((2*(r*i+j*k)),(1-2*(i*i+j*j)))
     try:
         euler_angles[1] = math.asin(2*(r*j-i*k))
     except ValueError:
         if data_print: print("Error Value, math domain with euler_angles conversion !")
     if abs(euler_angles[1]) >= 1:  # if true, out of range --> gives weird results
-        euler_angles[1] = math.pi/2 * (euler_angles[1]/abs(euler_angles[1]))  # set to 90° and keep the sign
-    euler_angles[2] = math.atan((2*(r*k+i*j))/(1-2*(j*j+k*k)))
+        euler_angles[1] = math.pi/2 * (euler_angles[1]/abs(euler_angles[1]))  # set to 90° and keep th$
+    euler_angles[2] = math.atan2((2*(r*k+i*j)),(1-2*(j*j+k*k)))
     # convert in degrees
     euler_angles[0] = round(math.degrees(euler_angles[0]))
     euler_angles[1] = round(math.degrees(euler_angles[1]))
@@ -724,11 +731,14 @@ def quat_to_euler_conv(quaternion_array):
     return euler_angles
 
 
+def getQuatAccuracy():
+    return quatAccuracy
+
+
 def getMagAccuracy():
     return magAccuracy
 
 
-# NEW
 def getLinAccelX():
     return qToFloat(rawLinAccelX, linear_accelerometer_Q1)  # qpoint of 8
 
@@ -739,6 +749,11 @@ def getLinAccelY():
 
 def getLinAccelZ():
     return qToFloat(rawLinAccelZ, linear_accelerometer_Q1)
+
+
+def round_array(array, decimals):
+    for i in range(len(array)):
+        array[i] = round(array[i], decimals)
 
 
 # -------------------------------------------------------------------
@@ -755,11 +770,11 @@ def calibrateIMU():  # [5] L108 - adapted/modified
         # try to calibrate and if successful, save that calibration to BNO080
         count = 0
         trials = 100
-        # 4 next lines already done in StartIMU()
-        # Enable Game Rotation Vector output --> mix accel + gyro
-        enableRotationVector(100)  # Send data update every 100ms
-        # Enable Magnetic Field output -> only magneto
-        enableMagnetometer(100)  # Send data update every 100ms
+        # asking the bno to report data
+        #ask_for_data(100)
+        enableMagnetometer(100)
+        enableRotationVector(100)
+        enableLinearAccelerometer(100)
         while not calibrated:
             # send the command to calibrate all sensors
             calibrateAll()
@@ -853,8 +868,8 @@ def checkCalibration():  # [5]L70 + L108 + L311 mix
         if debug_print: print(".\n[BNO080] Checking calibration")
         if dataAvailable():  # updates the values if data available (and there will be
             # since calibrateAll() sent calibrate cmd)
-            print("[BNO080] quatAcc = ", quatAccuracy, ", magAcc = ", magAccuracy)
-            if quatAccuracy == 3 and magAccuracy == 3:  # if True, high accuracy. We need it for both in a row
+            print("[BNO080] quatAcc = ", quatAccuracy, ", magAcc = ", magAccuracy, ", lin accel acc = ", lin_accelAccuracy)
+            if quatAccuracy == 3 and magAccuracy == 3 and lin_accelAccuracy == 3:  # if True, high accuracy. We need it for both in a row
                 # (so 2 following packets received contained 1 quatAcc =3 and the next magAcc = 3 or in opposite order)
                 goodData += 1
                 if debug_print: print("[BNO080] Good Data = ", goodData, " on ", count, " tests")
@@ -908,6 +923,22 @@ def endCalibration():  # [2] L772
     sendCalibrateCommand(CALIBRATE_STOP)
 
 
+def DCD_periodic_save(enable):
+    global shtpData
+    # clear the shtpData array
+    shtpData.clear()
+    for i in range(12):
+        shtpData.append(0)
+    # check if we want to enable/disable
+    if enable:
+        shtpData[3] = 1
+    else:  # disable
+        shtpData[3] = 0
+    # all other bytes are reserved
+    # send the command
+    sendCommand(COMMAND_DCD_PERIODIC)
+
+
 # -------------------------------------------------------------------
 # -------------------------- COMMAND --------------------------------
 # -------------------------------------------------------------------
@@ -918,7 +949,7 @@ def endCalibration():  # [2] L772
 def sendCommand(command):
     global shtpData, commandSequenceNumber
     shtpData[0] = SHTP_REPORT_COMMAND_REQUEST
-    if commandSequenceNumber > 256:
+    if commandSequenceNumber >= 256:
         commandSequenceNumber = 0
     shtpData[1] = commandSequenceNumber
     commandSequenceNumber += 1
@@ -937,12 +968,11 @@ def ask_for_data(report_delay_ms):
     # Enable Magnetic Field output -> only magneto
     enableMagnetometer(report_delay_ms)  # Send data update every x ms, 100ms has been used for the tests
     # Enable Game Rotation Vector output --> mix accel + gyro
-    # enableGameRotationVector(100)  # Send data update every 100ms
+    enableGameRotationVector(100)  # Send data update every 100ms
     # Enable Rotation Vector
-    enableRotationVector(report_delay_ms)  # Send data update every x ms, 100ms has been used for the tests
+    #enableRotationVector(report_delay_ms)  # Send data update every x ms, 100ms has been used for the tests
     # Enable accelerometer to get linear acceleration
-    enableLinearAccelerometer(report_delay_ms)  #NEW
-
+    enableLinearAccelerometer(report_delay_ms)
 
 def StartIMU(user_bcm_CSPin, user_bcm_WAKPin, user_bcm_INTPin, user_bcm_RSTPin, user_bcm_spiPortSpeed,
              user_bcm_spiPort, report_delay_ms):
@@ -1010,7 +1040,7 @@ def INT_callback(input):
 
 def update_data():
     if dataAvailable():
-        if last_report_id == SENSOR_REPORTID_ROTATION_VECTOR or last_report_id == SENSOR_REPORTID_GAME_ROTATION_VECTOR or last_report_id == SENSOR_REPORTID_MAGNETIC_FIELD or last_report_id == SENSOR_REPORTID_LINEAR_ACCELERATION:
+        if last_report_id == SENSOR_REPORTID_ROTATION_VECTOR or last_report_id == SENSOR_REPORTID_GAME_ROTATION_VECTOR or last_report_id == SENSOR_REPORTID_MAGNETIC_FIELD:
             if debug_print: print("----------- yes")
             return True
     if debug_print: print("--------- no data")
@@ -1071,7 +1101,7 @@ if __name__ == "__main__":
         # Just to make it wait with no particular process running
         # GPIO.setup(24, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         # GPIO.wait_for_edge(24, GPIO.RISING)
-        # enable_data_print()
+        enable_data_print()
         counter = 0
         while counter < 10000000:
             if update_data():
@@ -1116,6 +1146,7 @@ class BNO080:
         self.mag_acc = 0
         self.is_calibrated = False
         self.report_delay_ms = user_report_delay_ms
+        self.counter_check_activity = 0
         # start procedure
         StartIMU(user_bcm_CSPin, user_bcm_WAKPin, user_bcm_INTPin, user_bcm_RSTPin, user_spiPortSpeed, user_spiPort,
                  user_report_delay_ms)
@@ -1152,27 +1183,33 @@ class BNO080:
         return True
 
     def restart(self):
-        # soft reset
+         # soft reset
         softReset()
         # restart
         StartIMU(_cs, _wake, _int, _rst, _spiPortSpeed, _spiPort,
                  self.report_delay_ms)
+        #DCD_periodic_save(False) --> just to test if it is causing all the unsolicited init...
         #enable_data_print()
+        #enable_debugging()
         #while True:
         #    if update_data():
         #        None
 
     def get_latest_data(self):
         global unsolicited_init_happened
-        update_data()
-        if unsolicited_init_happened:
-               ask_for_data(self.report_delay_ms)
-               unsolicited_init_happened = False
+        self.counter_check_activity += 1
+        if update_data():
+            self.counter_check_activity = 0
+        if unsolicited_init_happened or self.counter_check_activity >= 100:
+            print("[BNO080] Ask for data again - counter check activity = ", self.counter_check_activity)
+            ask_for_data(self.report_delay_ms)
+            unsolicited_init_happened = False
 
     def get_quat_r_ijk(self):
+        round_array(self.quat_r_ijk, 3)
         return self.quat_r_ijk
 
-    def get_euler_ori(self):  # return eulers angles in degrees
+    def get_euler_ori(self):  # returns euler angles in degrees
         return quat_to_euler_conv(quat_r_ijk)
 
     def get_lin_accel(self):
