@@ -51,7 +51,7 @@ SHTP_REPORT_FRS_READ_REQUEST = 0xF4  # [3]L57
 SHTP_REPORT_FRS_READ_RESPONSE = 0xF3  # [3]L56
 SHTP_REPORT_SET_FEATURE_COMMAND = 0xFD  # [3]L61
 
-SENSOR_REPORTID_ACCELEROMETER = 0x01  # [3] beginning from L65 and for functionparseInputReport at L212
+SENSOR_REPORTID_ACCELEROMETER = 0x01  # [3] beginning from L65 and for function parseInputReport at L212
 SENSOR_REPORTID_GYROSCOPE = 0x02
 SENSOR_REPORTID_MAGNETIC_FIELD = 0x03
 SENSOR_REPORTID_LINEAR_ACCELERATION = 0x04
@@ -559,15 +559,11 @@ def parseInputReport():  # [2]L197
             data5 = shtpData[5 + 13] * 256 + shtpData[5 + 12]
         # Store these generic values to their proper global variable
         if shtpData[5] == SENSOR_REPORTID_ACCELEROMETER:
-            if data_print: print("SENSOR_REPORTID_ACCELEROMETER")
+            if data_print: print("SENSOR_REPORTID_ACCELEROMETER")  # not used here
             accelAccuracy = status
             rawAccelX = data1
-            lin_accel[0] = getLinAccelX()
             rawAccelY = data2
-            lin_accel[1] = getLinAccelY()
             rawAccelZ = data3
-            lin_accel[2] = getLinAccelZ()
-            print("[BNO080] lin_accel acc = ", accelAccuracy)
 
         elif shtpData[5] == SENSOR_REPORTID_LINEAR_ACCELERATION:
             if data_print: print("SENSOR_REPORTID_LINEAR_ACCELERATION")
@@ -578,6 +574,7 @@ def parseInputReport():  # [2]L197
             lin_accel[1] = getLinAccelY()
             rawLinAccelZ = data3
             lin_accel[2] = getLinAccelZ()
+            print("[BNO080] lin_accel acc = ", accelAccuracy)
 
         elif shtpData[5] == SENSOR_REPORTID_GYROSCOPE:
             if data_print: print("SENSOR_REPORTID_GYROSCOPE")
@@ -680,10 +677,19 @@ def parseCommandReport():
 # -------------------------------------------------------------------
 
 # Given a register value and a Q point, convert to float [2] L677
+# https://en.wikipedia.org/wiki/Q_(number_format)
 def qToFloat(fixedPointValue, qPoint):
+    # The converted values are wrong : - quaternions go from 0 to 1, above 1 and below 0 it jumps to 3.... !
+    #                                  - lin accel jumps randomly from 0 to 255 when the value oscillate around 0
+    # TODO /!\ check if Python converts the received bytes into another type that causes the values to be wrong
     q_float = 0.0
     if fixedPointValue is not None:
-        q_float = fixedPointValue
+        # wiki :
+        # 1. Convert the number to floating point as if it were an integer, in other words remove the binary point
+        q_float = fixedPointValue  # original code assuming the fixedPointValue given is already an int
+        # q_float = int(fixedPointValue)  # new try : making sure the fixedPointValue is an int, not tested yet
+        # if this doesn't fix the problem, check raw data managed in parseInputReport() function
+        # 2. Multiply by 2^(-qPoint)
         q_float *= pow(2, -qPoint)
     return q_float
 
