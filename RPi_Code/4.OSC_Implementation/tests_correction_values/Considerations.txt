@@ -1,0 +1,15 @@
+We get quaternions in 2's complement, 
+--> see ref manual 4.3.4 --> there they speak about a qpoint of 30...... ?
+--> see ref manual 6.4.4.3 --> Q-point of 14, as expected
+
+Under Rotation Vector/Game Rotation Vector (ref manual 6.5.18 & 6.5.19):
+	1. They don't mention 2's complement anymore...
+	   But we should get values for quat between -1 and +1 (as here https://quaternions.online/)
+	   So I assume they're still in 2's complement representation and that would be the origin of the wrong values.
+	2. They announce a Q point value of 14. According to the calculations*, in order to get values between -1 and +1,
+	   * --> desired_float_-1_+1 = rawQuat_value * pow(2,-qPoint), or in other words : desired_float_-1_+1= rawQuat_value/2^(qPoint)
+	   So the rawQuat_value should be [-2^(-14); +2^(-14)] = [-16385; +16385] to have desired_float_-1_+1 included in [-1;+1]
+	   BUT !!! We receive 16-bit values for rawQuat_value !!
+	   Considering 2's complement, the rawQuat_value can vary between [-32768;+32768] therefore, desired_float_-1_+1 vary between [-2;+2]
+
+What should we do? Divide by 2?
